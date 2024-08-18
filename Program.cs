@@ -1,6 +1,9 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using TrilhaApiDesafio.Context;
+using TrilhaApiDesafio.Exceptions;
+using TrilhaApiDesafio.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +18,34 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddScoped<TarefaService>();
+
 var app = builder.Build();
+
+app.UseExceptionHandler(exceptionHandlerApp =>
+    {
+        exceptionHandlerApp.Run(async context =>
+        {
+            context.Response.ContentType = System.Net.Mime.MediaTypeNames.Application.Json;
+            var erro = context.Features.Get<IExceptionHandlerPathFeature>().Error;
+
+            if (erro is NotFoundException)
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsJsonAsync(new { Erro = erro.Message });
+            }
+            else if (erro is BadRequestException)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsJsonAsync(new { Erro = erro.Message });
+            }
+            else
+            {
+                context.Response.StatusCode = 500;
+                await context.Response.WriteAsJsonAsync(new { Erro = "Ocorreu um erro interno" });
+            }
+        });
+    });
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
